@@ -83,11 +83,12 @@ rent_scenario_value = cum_rent + adjusted_equity
 investment_value = np.zeros(years)
 investment_value[0] = (net_proceeds + max(0, -net_rent[0])) * (1 + rate_of_return)
 for i in range(1, years):
-    additional_cash = max(0, -net_rent[i - 1])
+    additional_cash = max(0, -net_rent[i])
     investment_value[i] = (investment_value[i - 1] + additional_cash) * (1 + rate_of_return)
 
 discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range])
-adjusted_rent_value = rent_scenario_value / discount_factors
+discounted_rent = cum_rent / discount_factors
+adjusted_rent_value = discounted_rent + adjusted_equity
 adjusted_investment_value = investment_value / discount_factors
 
 # Create dataframe
