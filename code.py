@@ -79,10 +79,7 @@ cum_rent = np.cumsum(net_rent)
 adjusted_equity = equity - np.cumsum(opportunity_loss)
 rent_scenario_value = cum_rent + adjusted_equity
 
-# Updated: Add missed investment capital to invested proceeds
-missed_cashflow = np.array([min(0, net_rent[i]) for i in range(years)])
-adjusted_initial_investment = net_proceeds + abs(np.sum(missed_cashflow))
-investment_value = np.array([adjusted_initial_investment * ((1 + rate_of_return) ** i) for i in years_range])
+investment_value = net_proceeds * np.power(1 + rate_of_return, years_range - 1)
 
 discount_factors = np.array([(1 + discount_rate) ** i for i in years_range])
 adjusted_rent_value = rent_scenario_value / discount_factors
