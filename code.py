@@ -9,13 +9,15 @@ st.title("🏠 Rent vs Sell ROI Forecaster")
 st.sidebar.header("Scenario Parameters")
 years = st.sidebar.slider("Years to Project", 1, 30, 15)
 discount_rate = st.sidebar.slider("Inflation/Discount Rate (%)", 0.0, 10.0, 2.0) / 100
+opportunity_cost_rate = st.sidebar.slider("Opportunity Cost of Negative Cashflow (%)", 0.0, 10.0, 6.0) / 100
+income_tax_rate = st.sidebar.slider("Tax on Rental Income (%)", 0.0, 50.0, 30.0) / 100
 
 # Rent Scenario Inputs
 st.sidebar.subheader("Renting the Property")
 initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=1000000.0, step=10000.0)
 mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
 mortgage_rate = st.sidebar.slider("Mortgage Interest Rate (%)", 0.0, 10.0, 3.0) / 100
-mortgage_term = st.sidebar.slider("Remaining Mortgage Term (Years)", 1, 30, 25)
+monthly_mortgage_payment = st.sidebar.number_input("Monthly Mortgage Payment ($)", value=4100.0, step=50.0)
 
 monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=3000.0, step=100.0)
 rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 2.0) / 100
@@ -39,43 +41,48 @@ rate_of_return = st.sidebar.slider("Annual Investment Return (%)", 0.0, 12.0, 6.
 capital_gains = max(sale_price - initial_home_value, 0) * capital_gains_tax
 net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - capital_gains
 
-# Mortgage Payment Calculation (Fixed monthly payment based on term)
-r_monthly = mortgage_rate / 12
-n_payments = mortgage_term * 12
-if r_monthly > 0:
-    monthly_mortgage_payment = mortgage_balance * (r_monthly * (1 + r_monthly) ** n_payments) / ((1 + r_monthly) ** n_payments - 1)
-else:
-    monthly_mortgage_payment = mortgage_balance / n_payments
-
-# Amortization Schedule for True Equity Tracking
+# Amortization Schedule for True Equity and Interest Tracking
 remaining_balance = []
 principal_paid = []
+interest_paid_yearly = []
 balance = mortgage_balance
 
 for year in range(1, years + 1):
     interest_paid = 0
     principal_year = 0
     for _ in range(12):
-        interest = balance * r_monthly
+        interest = balance * (mortgage_rate / 12)
         principal = monthly_mortgage_payment - interest
         balance -= principal
         interest_paid += interest
         principal_year += principal
     remaining_balance.append(balance)
     principal_paid.append(principal_year)
+    interest_paid_yearly.append(interest_paid)
 
 # Projection Calculations
 years_range = np.arange(1, years + 1)
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
+tax_paid = rent_income * income_tax_rate
 house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
 equity = house_value - np.array(remaining_balance)
 
-fixed_costs = property_tax + maintenance + insurance + management_fees + (monthly_mortgage_payment * 12)
-net_rent = rent_income - fixed_costs
-cum_rent = np.cumsum(net_rent)
-rent_scenario_value = cum_rent + equity
+fixed_costs = np.array([
+    property_tax + maintenance + insurance + management_fees + interest_paid_yearly[i]
+    for i in range(years)
+]) + tax_paid
 
-investment_value = np.array([net_proceeds * ((1 + rate_of_return) ** i) for i in years_range])
+net_rent = rent_income - fixed_costs
+opportunity_loss = np.array([min(0, net_rent[i]) * ((1 + opportunity_cost_rate) ** (i + 1)) for i in range(years)])
+cum_rent = np.cumsum(net_rent)
+adjusted_equity = equity - np.cumsum(opportunity_loss)
+rent_scenario_value = cum_rent + adjusted_equity
+
+# Updated: Add missed investment capital to invested proceeds
+missed_cashflow = np.array([min(0, net_rent[i]) for i in range(years)])
+adjusted_initial_investment = net_proceeds + abs(np.sum(missed_cashflow))
+investment_value = np.array([adjusted_initial_investment * ((1 + rate_of_return) ** i) for i in years_range])
+
 discount_factors = np.array([(1 + discount_rate) ** i for i in years_range])
 adjusted_rent_value = rent_scenario_value / discount_factors
 adjusted_investment_value = investment_value / discount_factors
