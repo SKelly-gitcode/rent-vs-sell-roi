@@ -18,6 +18,7 @@ initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=100
 mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
 mortgage_rate = st.sidebar.slider("Mortgage Interest Rate (%)", 0.0, 10.0, 3.0) / 100
 monthly_mortgage_payment = st.sidebar.number_input("Monthly Mortgage Payment ($)", value=4100.0, step=50.0)
+mortgage_term_years = st.sidebar.slider("Remaining Mortgage Term (Years)", 1, 30, 22)
 
 monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=3000.0, step=100.0)
 rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 2.0) / 100
@@ -41,27 +42,27 @@ rate_of_return = st.sidebar.slider("Annual Investment Return (%)", 0.0, 12.0, 6.
 capital_gains = max(sale_price - initial_home_value, 0) * capital_gains_tax
 net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - capital_gains
 
-# Amortization Schedule for True Equity and Interest Tracking
-remaining_balance = []
-principal_paid = []
-interest_paid_yearly = []
+# Full amortization schedule over loan term
+full_amortization_balance = []
+full_interest_paid = []
 balance = mortgage_balance
 
-for year in range(1, years + 1):
+for year in range(mortgage_term_years):
     interest_paid = 0
-    principal_year = 0
     for _ in range(12):
         interest = balance * (mortgage_rate / 12)
         principal = monthly_mortgage_payment - interest
         balance -= principal
         interest_paid += interest
-        principal_year += principal
-    remaining_balance.append(balance)
-    principal_paid.append(principal_year)
-    interest_paid_yearly.append(interest_paid)
+    full_amortization_balance.append(balance)
+    full_interest_paid.append(interest_paid)
+
+# Limit to projection window
+years_range = np.arange(1, years + 1)
+remaining_balance = full_amortization_balance[:years]
+interest_paid_yearly = full_interest_paid[:years]
 
 # Projection Calculations
-years_range = np.arange(1, years + 1)
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
 tax_paid = rent_income * income_tax_rate
 house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
