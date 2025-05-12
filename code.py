@@ -47,19 +47,32 @@ if r_monthly > 0:
 else:
     monthly_mortgage_payment = mortgage_balance / n_payments
 
-total_annual_mortgage = monthly_mortgage_payment * 12
+# Amortization Schedule for True Equity Tracking
+remaining_balance = []
+principal_paid = []
+balance = mortgage_balance
+
+for year in range(1, years + 1):
+    interest_paid = 0
+    principal_year = 0
+    for _ in range(12):
+        interest = balance * r_monthly
+        principal = monthly_mortgage_payment - interest
+        balance -= principal
+        interest_paid += interest
+        principal_year += principal
+    remaining_balance.append(balance)
+    principal_paid.append(principal_year)
 
 # Projection Calculations
 years_range = np.arange(1, years + 1)
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
-fixed_costs = property_tax + maintenance + insurance + management_fees + total_annual_mortgage
-net_rent = np.array([rent_income[i - 1] - fixed_costs for i in years_range])
-cum_rent = np.cumsum(net_rent)
 house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
+equity = house_value - np.array(remaining_balance)
 
-# Estimate mortgage balance paid down linearly (approx)
-mortgage_decline = np.linspace(mortgage_balance, 0, years)
-equity = house_value - mortgage_decline
+fixed_costs = property_tax + maintenance + insurance + management_fees + (monthly_mortgage_payment * 12)
+net_rent = rent_income - fixed_costs
+cum_rent = np.cumsum(net_rent)
 rent_scenario_value = cum_rent + equity
 
 investment_value = np.array([net_proceeds * ((1 + rate_of_return) ** i) for i in years_range])
