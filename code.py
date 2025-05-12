@@ -70,18 +70,18 @@ house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in y
 equity = house_value - np.array(remaining_balance)
 
 fixed_costs = np.array([
-    property_tax + maintenance + insurance + management_fees + interest_paid_yearly[i]
+    property_tax + maintenance + insurance + management_fees + (monthly_mortgage_payment * 12)
     for i in range(years)
 ]) + tax_paid
 
 net_rent = rent_income - fixed_costs
 opportunity_loss = np.array([min(0, net_rent[i]) * ((1 + opportunity_cost_rate) ** (i + 1)) for i in range(years)])
 cum_rent = np.cumsum(net_rent)
-adjusted_equity = equity - np.cumsum(opportunity_loss)
+adjusted_equity = equity - opportunity_loss
 rent_scenario_value = cum_rent + adjusted_equity
 
 investment_value = np.zeros(years)
-investment_value[0] = net_proceeds * (1 + rate_of_return)
+investment_value[0] = (net_proceeds + max(0, -net_rent[0])) * (1 + rate_of_return)
 for i in range(1, years):
     additional_cash = max(0, -net_rent[i - 1])
     investment_value[i] = (investment_value[i - 1] + additional_cash) * (1 + rate_of_return)
