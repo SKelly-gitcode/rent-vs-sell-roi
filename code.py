@@ -13,6 +13,7 @@ discount_rate = st.sidebar.slider("Inflation/Discount Rate (%)", 0.0, 10.0, 2.0)
 # Rent Scenario Inputs
 st.sidebar.subheader("Renting the Property")
 initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=1000000.0, step=10000.0)
+mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
 monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=3000.0, step=100.0)
 rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 2.0) / 100
 home_growth = st.sidebar.slider("Annual Home Value Growth (%)", 0.0, 10.0, 4.0) / 100
@@ -24,8 +25,16 @@ management_fees = st.sidebar.number_input("Annual Management Fees ($)", value=30
 
 # Sell Scenario Inputs
 st.sidebar.subheader("Selling and Investing")
-net_proceeds = st.sidebar.number_input("Net Proceeds from Sale ($)", value=900000.0, step=10000.0)
+sale_price = st.sidebar.number_input("Expected Sale Price ($)", value=1000000.0, step=10000.0)
+mortgage_remaining = st.sidebar.number_input("Mortgage Remaining at Sale ($)", value=700000.0, step=10000.0)
+capital_gains_tax = st.sidebar.slider("Capital Gains Tax (%)", 0.0, 50.0, 0.0) / 100
+realtor_fees = st.sidebar.slider("Realtor Fees (%)", 0.0, 10.0, 5.0) / 100
+
 rate_of_return = st.sidebar.slider("Annual Investment Return (%)", 0.0, 12.0, 6.0) / 100
+
+# Calculate net proceeds from sale
+capital_gains = max(sale_price - initial_home_value, 0) * capital_gains_tax
+net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - capital_gains
 
 # Projection Calculations
 years_range = np.arange(1, years + 1)
@@ -34,13 +43,16 @@ fixed_costs = property_tax + maintenance + insurance + management_fees
 net_rent = np.array([rent_income[i - 1] - fixed_costs for i in years_range])
 cum_rent = np.cumsum(net_rent)
 house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
-rent_scenario_value = cum_rent + house_value
+mortgage_decline = np.linspace(mortgage_balance, 0, years)
+equity = house_value - mortgage_decline
+rent_scenario_value = cum_rent + equity
 
 investment_value = np.array([net_proceeds * ((1 + rate_of_return) ** i) for i in years_range])
 discount_factors = np.array([(1 + discount_rate) ** i for i in years_range])
 adjusted_rent_value = rent_scenario_value / discount_factors
 adjusted_investment_value = investment_value / discount_factors
 
+# Create dataframe
 df = pd.DataFrame({
     "Year": years_range,
     "Rent + Equity": adjusted_rent_value,
@@ -48,14 +60,13 @@ df = pd.DataFrame({
 })
 
 # Plot
+df.set_index("Year", inplace=True)
 st.subheader("Projected ROI Over Time")
 fig, ax = plt.subplots()
-ax.plot(df["Year"], df["Rent + Equity"], label="Rent + Home Equity")
-ax.plot(df["Year"], df["Invested Proceeds"], label="Invested Sale Proceeds")
+df.plot(ax=ax)
 ax.set_xlabel("Year")
 ax.set_ylabel("Value ($)")
 ax.set_title("Rent vs Sell ROI Comparison")
-ax.legend()
 st.pyplot(fig)
 
 # Crossover Point
