@@ -14,6 +14,9 @@ discount_rate = st.sidebar.slider("Inflation/Discount Rate (%)", 0.0, 10.0, 2.0)
 st.sidebar.subheader("Renting the Property")
 initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=1000000.0, step=10000.0)
 mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
+mortgage_rate = st.sidebar.slider("Mortgage Interest Rate (%)", 0.0, 10.0, 3.0) / 100
+mortgage_term = st.sidebar.slider("Remaining Mortgage Term (Years)", 1, 30, 25)
+
 monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=3000.0, step=100.0)
 rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 2.0) / 100
 home_growth = st.sidebar.slider("Annual Home Value Growth (%)", 0.0, 10.0, 4.0) / 100
@@ -36,13 +39,25 @@ rate_of_return = st.sidebar.slider("Annual Investment Return (%)", 0.0, 12.0, 6.
 capital_gains = max(sale_price - initial_home_value, 0) * capital_gains_tax
 net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - capital_gains
 
+# Mortgage Payment Calculation (Fixed monthly payment based on term)
+r_monthly = mortgage_rate / 12
+n_payments = mortgage_term * 12
+if r_monthly > 0:
+    monthly_mortgage_payment = mortgage_balance * (r_monthly * (1 + r_monthly) ** n_payments) / ((1 + r_monthly) ** n_payments - 1)
+else:
+    monthly_mortgage_payment = mortgage_balance / n_payments
+
+total_annual_mortgage = monthly_mortgage_payment * 12
+
 # Projection Calculations
 years_range = np.arange(1, years + 1)
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
-fixed_costs = property_tax + maintenance + insurance + management_fees
+fixed_costs = property_tax + maintenance + insurance + management_fees + total_annual_mortgage
 net_rent = np.array([rent_income[i - 1] - fixed_costs for i in years_range])
 cum_rent = np.cumsum(net_rent)
 house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
+
+# Estimate mortgage balance paid down linearly (approx)
 mortgage_decline = np.linspace(mortgage_balance, 0, years)
 equity = house_value - mortgage_decline
 rent_scenario_value = cum_rent + equity
