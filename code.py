@@ -81,12 +81,12 @@ adjusted_equity = equity - np.cumsum(opportunity_loss)
 rent_scenario_value = cum_rent + adjusted_equity
 
 investment_value = np.zeros(years)
-investment_value[0] = net_proceeds
+investment_value[0] = net_proceeds * (1 + rate_of_return)
 for i in range(1, years):
     additional_cash = -net_rent[i - 1]
     investment_value[i] = (investment_value[i - 1] + additional_cash) * (1 + rate_of_return)
 
-discount_factors = np.array([(1 + discount_rate) ** i for i in years_range])
+discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range])
 adjusted_rent_value = rent_scenario_value / discount_factors
 adjusted_investment_value = investment_value / discount_factors
 
