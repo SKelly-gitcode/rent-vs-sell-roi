@@ -13,6 +13,7 @@ opportunity_cost_rate = st.sidebar.slider("Opportunity Cost of Negative Cashflow
 income_tax_rate = st.sidebar.slider("Tax on Rental Income (%)", 0.0, 50.0, 30.0) / 100
 
 # Rent Scenario Inputs
+investor_loan = st.sidebar.number_input("Investor Loan ($)", value=100000.0, step=10000.0)
 st.sidebar.subheader("Renting the Property")
 initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=1000000.0, step=10000.0)
 mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
@@ -45,7 +46,7 @@ net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - cap
 # Full amortization schedule over loan term
 full_amortization_balance = []
 full_interest_paid = []
-balance = mortgage_balance
+balance = mortgage_balance - investor_loan
 
 for year in range(mortgage_term_years):
     interest_paid = 0
