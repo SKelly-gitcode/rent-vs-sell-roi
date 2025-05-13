@@ -97,9 +97,9 @@ df = pd.DataFrame({
     "Rent + Equity": adjusted_rent_value,
     "Invested Proceeds": adjusted_investment_value
 })
+df.set_index("Year", inplace=True)
 
 # Plot
-df.set_index("Year", inplace=True)
 st.subheader("Projected ROI Over Time")
 fig, ax = plt.subplots()
 df.plot(ax=ax)
@@ -115,5 +115,24 @@ if len(crossover) > 0:
 else:
     st.info("💡 Rent strategy remains superior over the selected timeframe.")
 
+# Show table
 with st.expander("📊 Show Yearly Data Table"):
     st.dataframe(df.style.format("{:.0f}"))
+
+# Debug breakdown for Year 1
+principal_paid = mortgage_balance - remaining_balance[0]
+year_1_house_value = initial_home_value  # No growth in year 1
+year_1_equity = year_1_house_value - remaining_balance[0]
+year_1_net_rent = net_rent[0]
+year_1_opp_loss = opportunity_loss[0]
+year_1_total = year_1_equity + year_1_net_rent - year_1_opp_loss
+
+st.subheader("🔎 Year 1 Breakdown (Rent Strategy)")
+st.markdown(f"""
+**Equity:** ${year_1_equity:,.0f}  
+**Principal Paid:** ${principal_paid:,.0f}  
+**Net Rent (after costs/tax):** ${year_1_net_rent:,.0f}  
+**Opportunity Cost on Neg. Cashflow:** ${year_1_opp_loss:,.0f}  
+**Year-End Position (Rent + Equity):** ${year_1_total:,.0f}  
+**App's Calculated Value:** ${adjusted_rent_value[0]:,.0f}
+""")
