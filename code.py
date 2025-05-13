@@ -63,30 +63,32 @@ years_range = np.arange(1, years + 1)
 remaining_balance = full_amortization_balance[:years]
 interest_paid_yearly = full_interest_paid[:years]
 
+# Discounting
+discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range])
+
 # Projection Calculations
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
 tax_paid = rent_income * income_tax_rate
-house_value = np.array([initial_home_value * ((1 + home_growth) ** i) for i in years_range])
+house_value = np.array([initial_home_value * ((1 + home_growth) ** (i - 1)) for i in years_range])
 equity = house_value - np.array(remaining_balance)
 
 annual_cash_out = property_tax + maintenance + insurance + management_fees
 fixed_costs = np.array(interest_paid_yearly) + annual_cash_out + tax_paid
 
 net_rent = rent_income - fixed_costs
-opportunity_loss = np.array([min(0, net_rent[i]) * opportunity_cost_rate for i in range(years)])
-cum_rent = np.cumsum(net_rent)
-adjusted_equity = equity - opportunity_loss
-rent_scenario_value = cum_rent + adjusted_equity
+opportunity_loss = np.where(net_rent < 0, -net_rent * opportunity_cost_rate, 0)
 
+discounted_rent = net_rent / discount_factors
+adjusted_equity = equity - opportunity_loss
+adjusted_rent_value = np.cumsum(discounted_rent) + adjusted_equity
+
+# Sell scenario projection
 investment_value = np.zeros(years)
 investment_value[0] = (net_proceeds + max(0, -net_rent[0])) * (1 + rate_of_return)
 for i in range(1, years):
     additional_cash = max(0, -net_rent[i])
     investment_value[i] = (investment_value[i - 1] + additional_cash) * (1 + rate_of_return)
 
-discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range])
-discounted_rent = cum_rent / discount_factors
-adjusted_rent_value = discounted_rent + adjusted_equity
 adjusted_investment_value = investment_value / discount_factors
 
 # Create dataframe
