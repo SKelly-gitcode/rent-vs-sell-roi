@@ -70,17 +70,20 @@ discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range
 rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
 tax_paid = rent_income * income_tax_rate
 house_value = np.array([initial_home_value * ((1 + home_growth) ** (i - 1)) for i in years_range])
-equity = house_value - np.array(remaining_balance)
+equity = house_value - np.array(remaining_balance) - investor_loan  # subtract investor payout
 
 annual_cash_out = property_tax + maintenance + insurance + management_fees
 fixed_costs = np.array(interest_paid_yearly) + annual_cash_out + tax_paid
 
 net_rent = rent_income - fixed_costs
 opportunity_loss = np.where(net_rent < 0, -net_rent * opportunity_cost_rate, 0)
-
 discounted_rent = net_rent / discount_factors
-adjusted_equity = equity - opportunity_loss
-adjusted_rent_value = np.cumsum(discounted_rent) + adjusted_equity
+
+# Final rent + equity position per year
+adjusted_rent_value = np.array([
+    equity[i] + np.sum(discounted_rent[:i+1]) - np.sum(opportunity_loss[:i+1])
+    for i in range(years)
+])
 
 # Sell scenario projection
 investment_value = np.zeros(years)
@@ -121,8 +124,7 @@ with st.expander("📊 Show Yearly Data Table"):
 
 # Debug breakdown for Year 1
 principal_paid = mortgage_balance - remaining_balance[0]
-year_1_house_value = initial_home_value  # No growth in year 1
-year_1_equity = year_1_house_value - remaining_balance[0]
+year_1_equity = initial_home_value - remaining_balance[0] - investor_loan
 year_1_net_rent = net_rent[0]
 year_1_opp_loss = opportunity_loss[0]
 year_1_total = year_1_equity + year_1_net_rent - year_1_opp_loss
