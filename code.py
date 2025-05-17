@@ -1,8 +1,9 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-st.set_page_config(layout="centered")
+st.set_page_config(layout="wide")
 st.title("🏠 Rent vs Sell Investment Analysis")
 
 # Sidebar Inputs
@@ -15,7 +16,9 @@ annual_taxes = st.sidebar.number_input("Annual Taxes", value=5000, step=100)
 annual_insurance = st.sidebar.number_input("Annual Insurance", value=2000, step=100)
 annual_other_fees = st.sidebar.number_input("Annual Other Fees", value=1000, step=100)
 monthly_rent_income = st.sidebar.number_input("Monthly Rent Income", value=3750, step=50)
+rent_increase_rate = st.sidebar.number_input("Annual Rent Increase Rate", value=0.02, step=0.001, format="%.3f")
 maintenance_rate = st.sidebar.number_input("Annual Maintenance Rate", value=0.01, step=0.001, format="%.3f")
+expense_inflation_rate = st.sidebar.number_input("Annual Expense Inflation Rate", value=0.02, step=0.001, format="%.3f")
 investor_debt = st.sidebar.number_input("Investor Debt", value=100_000, step=1000)
 realtor_fee_rate = st.sidebar.number_input("Realtor Fee Rate", value=0.05, step=0.005, format="%.3f")
 mortgage_penalty = st.sidebar.number_input("Mortgage Penalty", value=9000, step=500)
@@ -27,55 +30,76 @@ projection_years = st.sidebar.slider("Projection Period (Years)", 1, 30, 10)
 def mortgage_interest(balance, rate):
     return balance * rate
 
-# Scenario 1: Keep and Rent
-remaining_balance = mortgage_balance
-home_val_scenario = home_value
-cash_flow_rent = []
-
-for year in range(1, projection_years + 1):
-    interest_payment = mortgage_interest(remaining_balance, mortgage_rate)
-    principal_payment = (monthly_payment * 12) - interest_payment
-    remaining_balance -= principal_payment
-    annual_maintenance = home_val_scenario * maintenance_rate
-
-    annual_expenses = interest_payment + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance
-    annual_rental_income = monthly_rent_income * 12
-
-    net_cash_flow = annual_rental_income - annual_expenses
-    cash_flow_rent.append(net_cash_flow)
-
-    home_val_scenario *= (1 + home_appreciation_rate)
-
-final_equity_rent = home_val_scenario - remaining_balance - investor_debt
-
-# Scenario 2: Sell and Invest
-sale_proceeds = home_value * (1 - realtor_fee_rate) - mortgage_balance - investor_debt - mortgage_penalty
-annual_savings = []
+# Scenario Calculations
+rent_df = []
+sell_df = []
+remaining_balance_rent = mortgage_balance
 remaining_balance_sell = mortgage_balance
+current_home_value = home_value
+current_rent_income = monthly_rent_income * 12
 
 for year in range(1, projection_years + 1):
-    interest_payment = mortgage_interest(remaining_balance_sell, mortgage_rate)
+    # Rent scenario
+    interest_payment = mortgage_interest(remaining_balance_rent, mortgage_rate)
     principal_payment = (monthly_payment * 12) - interest_payment
-    remaining_balance_sell -= principal_payment
+    remaining_balance_rent -= principal_payment
+    annual_maintenance = current_home_value * maintenance_rate
+    annual_expenses = (interest_payment + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance) * ((1 + expense_inflation_rate) ** (year - 1))
+    annual_rental_income = current_rent_income * ((1 + rent_increase_rate) ** (year - 1))
+    net_cash_flow = annual_rental_income - annual_expenses
+    current_home_value *= (1 + home_appreciation_rate)
 
-    annual_maintenance = home_val_scenario * maintenance_rate
-    annual_expenses = interest_payment + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance
-    annual_rental_income = monthly_rent_income * 12
+    rent_df.append({
+        "Year": year,
+        "Home Value": current_home_value,
+        "Remaining Mortgage": remaining_balance_rent,
+        "Annual Cash Flow": net_cash_flow,
+        "Accumulated Equity": current_home_value - remaining_balance_rent - investor_debt
+    })
 
-    net_cash_flow = annual_expenses - annual_rental_income
-    annual_savings.append(net_cash_flow)
+    # Sell scenario
+    interest_payment_sell = mortgage_interest(remaining_balance_sell, mortgage_rate)
+    principal_payment_sell = (monthly_payment * 12) - interest_payment_sell
+    remaining_balance_sell -= principal_payment_sell
+    annual_expenses_sell = (interest_payment_sell + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance) * ((1 + expense_inflation_rate) ** (year - 1))
+    annual_savings = annual_expenses_sell - annual_rental_income
 
+    sell_df.append({
+        "Year": year,
+        "Annual Savings": annual_savings
+    })
+
+sale_proceeds = home_value * (1 - realtor_fee_rate) - mortgage_balance - investor_debt - mortgage_penalty
 investment_balance = sale_proceeds
 
-for saving in annual_savings:
-    investment_balance = investment_balance * (1 + market_return) + saving
+investment_balances = []
+for year in sell_df:
+    investment_balance = investment_balance * (1 + market_return) + year["Annual Savings"]
+    investment_balances.append(investment_balance)
 
-# Results
-results_df = pd.DataFrame({
-    "Scenario": ["Keep & Rent", "Sell & Invest"],
-    "Final Equity / Investment": [final_equity_rent, investment_balance],
-    "Total Net Gain": [final_equity_rent + sum(cash_flow_rent), investment_balance]
-})
+# Results DataFrame
+rent_df = pd.DataFrame(rent_df)
+sell_df = pd.DataFrame(sell_df)
+sell_df["Investment Balance"] = investment_balances
 
-st.subheader("Comparison of Scenarios")
-st.dataframe(results_df.set_index("Scenario").style.format("${:,.2f}"))
+# Display Tables
+st.subheader("Year-over-Year Details")
+col1, col2 = st.columns(2)
+with col1:
+    st.write("### Rent Scenario")
+    st.dataframe(rent_df.set_index("Year").style.format("${:,.2f}"))
+with col2:
+    st.write("### Sell & Invest Scenario")
+    st.dataframe(sell_df.set_index("Year").style.format("${:,.2f}"))
+
+# Graph
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(rent_df["Year"], rent_df["Accumulated Equity"], label="Rent Scenario Equity")
+ax.plot(sell_df["Year"], sell_df["Investment Balance"], label="Sell & Invest Scenario")
+ax.set_xlabel("Year")
+ax.set_ylabel("Value ($)")
+ax.set_title("Investment Scenarios Over Time")
+ax.legend()
+ax.grid(True)
+
+st.pyplot(fig)
