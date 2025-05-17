@@ -57,11 +57,8 @@ for year in range(1, projection_years + 1):
         "Accumulated Equity": current_home_value - remaining_balance_rent - investor_debt
     })
 
-    # Sell scenario
-    interest_payment_sell = mortgage_interest(remaining_balance_sell, mortgage_rate)
-    principal_payment_sell = (monthly_payment * 12) - interest_payment_sell
-    remaining_balance_sell -= principal_payment_sell
-    annual_expenses_sell = (interest_payment_sell + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance) * ((1 + expense_inflation_rate) ** (year - 1))
+    # Sell scenario (corrected)
+    annual_expenses_sell = (monthly_payment * 12 + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance) * ((1 + expense_inflation_rate) ** (year - 1))
     annual_savings = annual_expenses_sell - annual_rental_income
 
     sell_df.append({
