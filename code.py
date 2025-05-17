@@ -1,140 +1,81 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
 
 st.set_page_config(layout="centered")
-st.title("🏠 Rent vs Sell ROI Forecaster")
+st.title("🏠 Rent vs Sell Investment Analysis")
 
-st.sidebar.header("Scenario Parameters")
-years = st.sidebar.slider("Years to Project", 1, 30, 15)
-discount_rate = st.sidebar.slider("Inflation/Discount Rate (%)", 0.0, 10.0, 2.0) / 100
-opportunity_cost_rate = st.sidebar.slider("Opportunity Cost of Negative Cashflow (%)", 0.0, 10.0, 6.0) / 100
-income_tax_rate = st.sidebar.slider("Tax on Rental Income (%)", 0.0, 50.0, 30.0) / 100
+# Sidebar Inputs
+st.sidebar.header("Investment Parameters")
+home_value = st.sidebar.number_input("Home Value", value=1_250_000, step=1000)
+mortgage_balance = st.sidebar.number_input("Mortgage Balance", value=739_000, step=1000)
+mortgage_rate = st.sidebar.number_input("Mortgage Interest Rate", value=0.0499, step=0.001, format="%.4f")
+monthly_payment = st.sidebar.number_input("Monthly Mortgage Payment", value=4100, step=100)
+annual_taxes = st.sidebar.number_input("Annual Taxes", value=5000, step=100)
+annual_insurance = st.sidebar.number_input("Annual Insurance", value=2000, step=100)
+annual_other_fees = st.sidebar.number_input("Annual Other Fees", value=1000, step=100)
+monthly_rent_income = st.sidebar.number_input("Monthly Rent Income", value=3750, step=50)
+maintenance_rate = st.sidebar.number_input("Annual Maintenance Rate", value=0.01, step=0.001, format="%.3f")
+investor_debt = st.sidebar.number_input("Investor Debt", value=100_000, step=1000)
+realtor_fee_rate = st.sidebar.number_input("Realtor Fee Rate", value=0.05, step=0.005, format="%.3f")
+mortgage_penalty = st.sidebar.number_input("Mortgage Penalty", value=9000, step=500)
+market_return = st.sidebar.number_input("Annual Market Return", value=0.07, step=0.005, format="%.3f")
+home_appreciation_rate = st.sidebar.number_input("Annual Home Appreciation Rate", value=0.03, step=0.001, format="%.3f")
+projection_years = st.sidebar.slider("Projection Period (Years)", 1, 30, 10)
 
-# Rent Scenario Inputs
-investor_loan = st.sidebar.number_input("Investor Loan ($)", value=100000.0, step=10000.0)
-st.sidebar.subheader("Renting the Property")
-initial_home_value = st.sidebar.number_input("Current Home Value ($)", value=1000000.0, step=10000.0)
-mortgage_balance = st.sidebar.number_input("Current Mortgage Balance ($)", value=700000.0, step=10000.0)
-mortgage_rate = st.sidebar.slider("Mortgage Interest Rate (%)", 0.0, 10.0, 3.0) / 100
-monthly_mortgage_payment = st.sidebar.number_input("Monthly Mortgage Payment ($)", value=4100.0, step=50.0)
-mortgage_term_years = st.sidebar.slider("Remaining Mortgage Term (Years)", 1, 30, 22)
+# Mortgage Interest Calculation
+def mortgage_interest(balance, rate):
+    return balance * rate
 
-monthly_rent = st.sidebar.number_input("Monthly Rent ($)", value=3000.0, step=100.0)
-rent_increase = st.sidebar.slider("Annual Rent Increase (%)", 0.0, 10.0, 2.0) / 100
-home_growth = st.sidebar.slider("Annual Home Value Growth (%)", 0.0, 10.0, 4.0) / 100
+# Scenario 1: Keep and Rent
+remaining_balance = mortgage_balance
+home_val_scenario = home_value
+cash_flow_rent = []
 
-property_tax = st.sidebar.number_input("Annual Property Tax ($)", value=6000.0)
-maintenance = st.sidebar.number_input("Annual Maintenance ($)", value=5000.0)
-insurance = st.sidebar.number_input("Annual Insurance ($)", value=2000.0)
-management_fees = st.sidebar.number_input("Annual Management Fees ($)", value=3000.0)
+for year in range(1, projection_years + 1):
+    interest_payment = mortgage_interest(remaining_balance, mortgage_rate)
+    principal_payment = (monthly_payment * 12) - interest_payment
+    remaining_balance -= principal_payment
+    annual_maintenance = home_val_scenario * maintenance_rate
 
-# Sell Scenario Inputs
-st.sidebar.subheader("Selling and Investing")
-sale_price = st.sidebar.number_input("Expected Sale Price ($)", value=1000000.0, step=10000.0)
-mortgage_remaining = st.sidebar.number_input("Mortgage Remaining at Sale ($)", value=700000.0, step=10000.0)
-capital_gains_tax = st.sidebar.slider("Capital Gains Tax (%)", 0.0, 50.0, 0.0) / 100
-realtor_fees = st.sidebar.slider("Realtor Fees (%)", 0.0, 10.0, 5.0) / 100
+    annual_expenses = interest_payment + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance
+    annual_rental_income = monthly_rent_income * 12
 
-rate_of_return = st.sidebar.slider("Annual Investment Return (%)", 0.0, 12.0, 6.0) / 100
+    net_cash_flow = annual_rental_income - annual_expenses
+    cash_flow_rent.append(net_cash_flow)
 
-# Calculate net proceeds from sale
-capital_gains = max(sale_price - initial_home_value, 0) * capital_gains_tax
-net_proceeds = sale_price - realtor_fees * sale_price - mortgage_remaining - capital_gains
+    home_val_scenario *= (1 + home_appreciation_rate)
 
-# Full amortization schedule over loan term
-full_amortization_balance = []
-full_interest_paid = []
-balance = mortgage_balance - investor_loan
+final_equity_rent = home_val_scenario - remaining_balance - investor_debt
 
-for year in range(mortgage_term_years):
-    interest_paid = 0
-    for _ in range(12):
-        interest = balance * (mortgage_rate / 12)
-        principal = monthly_mortgage_payment - interest
-        balance -= principal
-        interest_paid += interest
-    full_amortization_balance.append(balance)
-    full_interest_paid.append(interest_paid)
+# Scenario 2: Sell and Invest
+sale_proceeds = home_value * (1 - realtor_fee_rate) - mortgage_balance - investor_debt - mortgage_penalty
+annual_savings = []
+remaining_balance_sell = mortgage_balance
 
-# Limit to projection window
-years_range = np.arange(1, years + 1)
-remaining_balance = full_amortization_balance[:years]
-interest_paid_yearly = full_interest_paid[:years]
+for year in range(1, projection_years + 1):
+    interest_payment = mortgage_interest(remaining_balance_sell, mortgage_rate)
+    principal_payment = (monthly_payment * 12) - interest_payment
+    remaining_balance_sell -= principal_payment
 
-# Discounting
-discount_factors = np.array([(1 + discount_rate) ** (i - 1) for i in years_range])
+    annual_maintenance = home_val_scenario * maintenance_rate
+    annual_expenses = interest_payment + annual_taxes + annual_insurance + annual_other_fees + annual_maintenance
+    annual_rental_income = monthly_rent_income * 12
 
-# Projection Calculations
-rent_income = np.array([(monthly_rent * 12) * ((1 + rent_increase) ** (i - 1)) for i in years_range])
-tax_paid = rent_income * income_tax_rate
-house_value = np.array([initial_home_value * ((1 + home_growth) ** (i - 1)) for i in years_range])
-equity = house_value - np.array(remaining_balance) - investor_loan  # subtract investor payout
+    net_cash_flow = annual_expenses - annual_rental_income
+    annual_savings.append(net_cash_flow)
 
-annual_cash_out = property_tax + maintenance + insurance + management_fees
-fixed_costs = np.array(interest_paid_yearly) + annual_cash_out + tax_paid
+investment_balance = sale_proceeds
 
-net_rent = rent_income - fixed_costs
-opportunity_loss = np.where(net_rent < 0, -net_rent * opportunity_cost_rate, 0)
-discounted_rent = net_rent / discount_factors
+for saving in annual_savings:
+    investment_balance = investment_balance * (1 + market_return) + saving
 
-# Final rent + equity position per year
-adjusted_rent_value = np.array([
-    equity[i] + np.sum(discounted_rent[:i+1]) - np.sum(opportunity_loss[:i+1])
-    for i in range(years)
-])
-
-# Sell scenario projection
-investment_value = np.zeros(years)
-investment_value[0] = (net_proceeds + max(0, -net_rent[0])) * (1 + rate_of_return)
-for i in range(1, years):
-    additional_cash = max(0, -net_rent[i])
-    investment_value[i] = (investment_value[i - 1] + additional_cash) * (1 + rate_of_return)
-
-adjusted_investment_value = investment_value / discount_factors
-
-# Create dataframe
-df = pd.DataFrame({
-    "Year": years_range,
-    "Rent + Equity": adjusted_rent_value,
-    "Invested Proceeds": adjusted_investment_value
+# Results
+results_df = pd.DataFrame({
+    "Scenario": ["Keep & Rent", "Sell & Invest"],
+    "Final Equity / Investment": [final_equity_rent, investment_balance],
+    "Total Net Gain": [final_equity_rent + sum(cash_flow_rent), investment_balance]
 })
-df.set_index("Year", inplace=True)
 
-# Plot
-st.subheader("Projected ROI Over Time")
-fig, ax = plt.subplots()
-df.plot(ax=ax)
-ax.set_xlabel("Year")
-ax.set_ylabel("Value ($)")
-ax.set_title("Rent vs Sell ROI Comparison")
-st.pyplot(fig)
-
-# Crossover Point
-crossover = np.where(adjusted_investment_value > adjusted_rent_value)[0]
-if len(crossover) > 0:
-    st.success(f"💡 Investment surpasses rent strategy in year {crossover[0] + 1}.")
-else:
-    st.info("💡 Rent strategy remains superior over the selected timeframe.")
-
-# Show table
-with st.expander("📊 Show Yearly Data Table"):
-    st.dataframe(df.style.format("{:.0f}"))
-
-# Debug breakdown for Year 1
-principal_paid = mortgage_balance - remaining_balance[0]
-year_1_equity = initial_home_value - remaining_balance[0] - investor_loan
-year_1_net_rent = net_rent[0]
-year_1_opp_loss = opportunity_loss[0]
-year_1_total = year_1_equity + year_1_net_rent - year_1_opp_loss
-
-st.subheader("🔎 Year 1 Breakdown (Rent Strategy)")
-st.markdown(f"""
-**Equity:** ${year_1_equity:,.0f}  
-**Principal Paid:** ${principal_paid:,.0f}  
-**Net Rent (after costs/tax):** ${year_1_net_rent:,.0f}  
-**Opportunity Cost on Neg. Cashflow:** ${year_1_opp_loss:,.0f}  
-**Year-End Position (Rent + Equity):** ${year_1_total:,.0f}  
-**App's Calculated Value:** ${adjusted_rent_value[0]:,.0f}
-""")
+st.subheader("Comparison of Scenarios")
+st.dataframe(results_df.set_index("Scenario").style.format("${:,.2f}"))
